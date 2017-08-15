@@ -6,6 +6,7 @@ redis基础操作
 # -*- coding: UTF-8 -*-
 
 import redis
+import json
 
 host = '127.0.0.1'
 port = 6379
@@ -21,7 +22,21 @@ if value is None:
 
 key = 'hash_key'
 field = 'field_1'
-value = r.hget(key, field)
-if value is None:
-    value = 'hash_value'
-    r.hset(key, field, value)
+value = {'1': '2', '11': '22'}
+print(value)
+print(type(value))
+json_value = json.dumps(value)
+print(json_value)
+print(type(json_value))
+r.hset(key, field, json_value)
+byte_value = r.hget(key, field)
+print(byte_value)
+print(type(byte_value))
+str_value = byte_value.decode()
+print(str_value)
+print(type(str_value))
+value = json.loads(str_value)
+print(value)
+print(type(value))
+
+

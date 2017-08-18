@@ -5,3 +5,4 @@
 > * [redis基础操作](/src/redis_op.py)
 > * [mysql基础操作](/src/mysql_op.py)
 > * [图片相似算法](/src/similar.py)
+> * [图像卷积](/src/convolution.py)

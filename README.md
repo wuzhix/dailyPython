@@ -7,3 +7,4 @@
 > * [图片相似算法](/src/similar.py)
 > * [图像卷积](/src/convolution.py)
 > * [图像和数组相互转换](/src/image2array.py)
+> * [numpy的ndarray简单使用](/src/ndarray_obj.py)

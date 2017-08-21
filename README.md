@@ -6,3 +6,4 @@
 > * [mysql基础操作](/src/mysql_op.py)
 > * [图片相似算法](/src/similar.py)
 > * [图像卷积](/src/convolution.py)
+> * [图像和数组相互转换](/src/image2array.py)

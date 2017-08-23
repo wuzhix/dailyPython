@@ -239,34 +239,37 @@ for epoch in range(n_epoch):
     x_train_a, y_train_a = read_image()
     # print(y_train_a)
     # 开始训练
-    _, err, ac = sess.run([train_op, loss, acc], feed_dict={x: x_train_a, y_: y_train_a})
-    del x_train_a
-    del y_train_a
-    print("   train loss: %f" % err)
-    print("   train acc: %f" % ac)
-    end_time = time.time()
-    diff = end_time - start_time
-    print("time %f" % diff)
-    cur_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    print("cur date : ", cur_date)
-    if ac > max_acc:
-        max_acc = ac
-        saver.save(sess, 'ckpt/pic-cat')
-        # train_loss += err
-        # train_acc += ac
-        # n_batch += 1
-        # # logit = sess.run(logits, feed_dict={x: x_train_a})
-        # # print(logit)
-        # # print(y_train_a)
-        # print(n_batch)
-        # print("   train loss: %f" % (train_loss / n_batch))
-        # print("   train acc: %f" % (train_acc / n_batch))
-        # end_time = time.time()
-        # diff = end_time - start_time
-        # print("time %f" % diff)
-        # cur_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        # print("cur date : ", cur_date)
-        # if train_acc > max_acc:
-        #     max_acc = train_acc
-        #     saver.save(sess, 'ckpt/pic-cat')
+    if len(x_train_a) > 0 and len(y_train_a) > 0:
+        _, err, ac = sess.run([train_op, loss, acc], feed_dict={x: x_train_a, y_: y_train_a})
+        del x_train_a
+        del y_train_a
+        print("   train loss: %f" % err)
+        print("   train acc: %f" % ac)
+        end_time = time.time()
+        diff = end_time - start_time
+        print("time %f" % diff)
+        cur_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        print("cur date : ", cur_date)
+        if ac > max_acc:
+            max_acc = ac
+            saver.save(sess, 'ckpt/pic-cat')
+            # train_loss += err
+            # train_acc += ac
+            # n_batch += 1
+            # # logit = sess.run(logits, feed_dict={x: x_train_a})
+            # # print(logit)
+            # # print(y_train_a)
+            # print(n_batch)
+            # print("   train loss: %f" % (train_loss / n_batch))
+            # print("   train acc: %f" % (train_acc / n_batch))
+            # end_time = time.time()
+            # diff = end_time - start_time
+            # print("time %f" % diff)
+            # cur_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            # print("cur date : ", cur_date)
+            # if train_acc > max_acc:
+            #     max_acc = train_acc
+            #     saver.save(sess, 'ckpt/pic-cat')
+    else:
+        start_ids = {}
 sess.close()

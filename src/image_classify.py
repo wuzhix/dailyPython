@@ -4,14 +4,14 @@ import requests
 import numpy as np
 from PIL import Image
 from io import BytesIO
-# from skimage import io, transform
 import pymysql
 import tensorflow as tf
 import time
-import random
 import redis
 import json
 import os
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 # 定义图像尺寸
 width = 100
@@ -29,40 +29,51 @@ password = ''
 db_port = 3306
 database = 'test'
 table = 'pic_data'
-# 批量运算的数量
-# batch = 50
 
 
+# 读取图片分类
 def read_cat():
+    # 连接redis
     r = redis.Redis(host=host, port=redis_port, db=redis_db)
+    # redis取数
     cat_data = r.get(redis_key)
     if cat_data is None:
-        # 连接数据库，这里一定要加上charset="utf8",不然会乱码
+        # 连接数据库，这里一定要加上charset，不然查询的中文会乱码
         db = pymysql.connect(host=server, port=db_port, user=username, password=password, database=database,
                              charset="utf8")
         # 使用cursor()方法获取操作游标
         cursor = db.cursor()
-        # 查询语句
+        # 查出所有不同类别
         query_sql = "select distinct(cat) from %s" % table
         # 执行sql语句
         cursor.execute(query_sql)
         # 获取查询结果
         results = cursor.fetchall()
+        db.close()
+        # 将结果转换为一维list
         cat_data = [y for x in results for y in x]
+        del results
+        # 缓存分类
         r.set(redis_key, json.dumps(cat_data))
     else:
+        # 读取分类
         cat_data = cat_data.decode()
         cat_data = json.loads(cat_data)
     return cat_data
 
+
+# 获取分类
 cat_arr = read_cat()
 start_ids = {}
 
+
+# 读取图片
 def read_image():
+    # 初始化每种分类的图片起始id
     if len(start_ids) == 0:
         for cat in cat_arr:
             start_ids[cat] = 1
-    # 连接数据库，这里一定要加上charset="utf8",不然会乱码
+    # 连接数据库，这里一定要加上charset，不然读取的中文会乱码
     db = pymysql.connect(host=server, port=db_port, user=username, password=password, database=database, charset="utf8")
     # 使用cursor()方法获取操作游标
     cursor = db.cursor()
@@ -83,13 +94,16 @@ def read_image():
         cursor.execute(query_sql)
         # 获取查询结果
         result = cursor.fetchone()
-        results.append(result)
-        # print(query_sql)
-        # print(result, cat, start_ids[cat])
-        if result[0] == start_ids[cat]:
-            start_ids[cat] += 1
-        else:
-            start_ids[cat] = result[0] + 1
+        if result is not None:
+            results.append(result)
+            # print(query_sql)
+            # print(result, cat, start_ids[cat])
+            # 更新每种分类的起始id
+            if result[0] == start_ids[cat]:
+                start_ids[cat] += 1
+            else:
+                start_ids[cat] = result[0] + 1
+            del result
     # 关闭连接
     db.close()
     imgs = []
@@ -110,6 +124,7 @@ def read_image():
                 # img = Image.open('1.jpg')
                 # 图片尺寸设置为100*100，然后转换为np数组，每个值除以255取浮点数结果
                 arr = np.array(img.resize((width, height))) / 255
+                del img
                 # print(row[0], arr.shape)
                 # print(arr.shape, arr.dtype)
                 # img = io.imread(BytesIO(response.content))
@@ -117,12 +132,14 @@ def read_image():
                 # print(arr.shape, arr.dtype)
             except:
                 continue
-            # yield arr, row[2]
             # 填充list
             if len(arr.shape) == 3 and arr.shape[2] == 3:
                 imgs.append(arr)
                 lables.append(cat_arr.index(row[2]))
+            del arr
+        del response
     # asarray将list转换为ndarray
+    del results
     return np.asarray(imgs, np.float32), np.asarray(lables, np.int32)
 
 
@@ -191,32 +208,65 @@ logits = tf.layers.dense(inputs=dense2,
                          kernel_regularizer=tf.contrib.layers.l2_regularizer(0.003))
 # ---------------------------网络结束---------------------------
 
+# 损失函数
 loss = tf.losses.sparse_softmax_cross_entropy(labels=y_, logits=logits)
-train_op = tf.train.AdamOptimizer(learning_rate=0.001).minimize(loss)
+# 使用Adam 算法的Optimizer
+train_op = tf.train.AdamOptimizer(learning_rate=0.01).minimize(loss)
+# 结果是否匹配
 correct_prediction = tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), y_)
+# 计算准确率
 acc = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-
-# 训练和测试数据，可将n_epoch设置更大一些
+# 训练次数
 n_epoch = 1000
 sess = tf.InteractiveSession()
-sess.run(tf.global_variables_initializer())
+
+saver = tf.train.Saver(max_to_keep=1)
+# 读取保存的模型
+model_file = tf.train.latest_checkpoint('ckpt/')
+if model_file is None:
+    # 如果没有保存模型，初始化所有变量
+    sess.run(tf.global_variables_initializer())
+else:
+    # 如果保存了模型，直接从模型中初始化变量
+    saver.restore(sess, model_file)
+max_acc = 0
 for epoch in range(n_epoch):
     start_time = time.time()
-
     # training
     train_loss, train_acc, n_batch = 0, 0, 0
 
     x_train_a, y_train_a = read_image()
     # print(y_train_a)
+    # 开始训练
     _, err, ac = sess.run([train_op, loss, acc], feed_dict={x: x_train_a, y_: y_train_a})
-    train_loss += err
-    train_acc += ac
-    n_batch += 1
-    logit = sess.run(logits, feed_dict={x: x_train_a})
-    # print(logit)
-    # print(y_train_a)
-    print("   train loss: %f" % (train_loss / n_batch))
-    print("   train acc: %f" % (train_acc / n_batch))
-
+    del x_train_a
+    del y_train_a
+    print("   train loss: %f" % err)
+    print("   train acc: %f" % ac)
+    end_time = time.time()
+    diff = end_time - start_time
+    print("time %f" % diff)
+    cur_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    print("cur date : ", cur_date)
+    if ac > max_acc:
+        max_acc = ac
+        saver.save(sess, 'ckpt/pic-cat')
+        # train_loss += err
+        # train_acc += ac
+        # n_batch += 1
+        # # logit = sess.run(logits, feed_dict={x: x_train_a})
+        # # print(logit)
+        # # print(y_train_a)
+        # print(n_batch)
+        # print("   train loss: %f" % (train_loss / n_batch))
+        # print("   train acc: %f" % (train_acc / n_batch))
+        # end_time = time.time()
+        # diff = end_time - start_time
+        # print("time %f" % diff)
+        # cur_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        # print("cur date : ", cur_date)
+        # if train_acc > max_acc:
+        #     max_acc = train_acc
+        #     saver.save(sess, 'ckpt/pic-cat')
 sess.close()

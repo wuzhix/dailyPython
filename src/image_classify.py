@@ -10,6 +10,7 @@ import time
 import redis
 import json
 import os
+import sys
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -67,9 +68,9 @@ cat_arr = read_cat()
 # 每个分类的起始id，用来查找数据
 start_ids = {}
 # 每次查找每个分类的数据条数
-batch_size = 1
+batch_size = 70
 # 每一轮循环批量训练的次数
-batch_times = 100
+batch_times = 1000
 
 
 # 读取图片
@@ -96,25 +97,27 @@ def read_image():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
         '''
         results = []
+        # start_time = time.time()
         for cat in start_ids:
             # 查询语句
             query_sql = "select * from %s where id >= %d and cat = %d limit %d" % (table, start_ids[cat], cat, batch_size)
             # 执行sql语句
             cursor.execute(query_sql)
             # 获取查询结果
-            result = cursor.fetchone()
+            result = cursor.fetchall()
             if result is not None:
-                results.append(result)
+                results = results + list(result)
                 # print(query_sql)
                 # print(result, cat, start_ids[cat])
                 # 更新每种分类的起始id
-                if result[0] == start_ids[cat]:
-                    start_ids[cat] += 1
+                if result[-1][0] == start_ids[cat]:
+                    start_ids[cat] += batch_size + 1
                 else:
-                    start_ids[cat] = result[0] + 1
+                    start_ids[cat] = result[-1][0] + 1
                 del result
         imgs = []
         lables = []
+        # print(len(results))
         for i, row in enumerate(results):
             # requests.get(url)和Image.open(BytesIO(response.content))都会抛出异常
             try:
@@ -130,7 +133,7 @@ def read_image():
                     img = Image.open(BytesIO(response.content))
                     # img = Image.open('1.jpg')
                     # 图片尺寸设置为100*100，然后转换为np数组，每个值除以255取浮点数结果
-                    arr = np.array(img.resize((width, height))) / 255
+                    arr = np.round(np.array(img.resize((width, height))) / 255, 4)
                     del img
                     # print(row[0], arr.shape)
                     # print(arr.shape, arr.dtype)
@@ -147,6 +150,10 @@ def read_image():
             del response
         # asarray将list转换为ndarray
         del results
+        # print('make data')
+        # end_time = time.time()
+        # diff = round(end_time - start_time, 2)
+        # print('make data: ', diff)
         yield np.asarray(imgs, np.float32), np.asarray(lables, np.int32)
         del imgs
         del lables
@@ -231,7 +238,7 @@ correct_prediction = tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), y_)
 acc = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 # 训练次数
-n_epoch = 1000
+n_epoch = 100
 sess = tf.InteractiveSession()
 
 saver = tf.train.Saver(max_to_keep=1)
@@ -245,30 +252,31 @@ else:
     saver.restore(sess, model_file)
 max_acc = 0
 for epoch in range(n_epoch):
-    start_time = time.time()
     # training
     train_loss, train_acc, n_batch = 0, 0, 0
     # 开始训练（小批量优化算法）
     for x_train_a, y_train_a in read_image():
         if len(x_train_a) > 0 and len(y_train_a) > 0:
+            start_time = time.time()
             _, err, ac = sess.run([train_op, loss, acc], feed_dict={x: x_train_a, y_: y_train_a})
             # 统计平均结果
             train_loss += err
             train_acc += ac
             n_batch += 1
+            end_time = time.time()
+            diff = round(end_time - start_time, 2)
+            print("epoch: %d, n_batch: %d, err: %f, ac: %f, diff: %f" % (epoch, n_batch, err, ac, diff))
+            sys.stdout.flush()
+            if ac > max_acc:
+                max_acc = ac
+                saver.save(sess, 'ckpt/pic-cat')
+            # print(start_ids)
         else:
             # 数据为空时重新初始化起始id
             start_ids = {}
         del x_train_a
         del y_train_a
-    end_time = time.time()
-    diff = end_time - start_time
-    print("time %f" % diff)
-    cur_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    print("cur date : ", cur_date)
-    print("   train loss: %f" % (train_loss / n_batch))
-    print("   train acc: %f" % (train_acc / n_batch))
-    if ac > max_acc:
-        max_acc = ac
-        saver.save(sess, 'ckpt/pic-cat')
+    # print("   train loss: %f" % (train_loss / n_batch))
+    # print("   train acc: %f" % (train_acc / n_batch))
+    # sys.stdout.flush()
 sess.close()

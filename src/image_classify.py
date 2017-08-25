@@ -70,7 +70,7 @@ start_ids = {}
 # 每次查找每个分类的数据条数
 batch_size = 10
 # 每一轮循环批量训练的次数
-batch_times = 500
+batch_times = 1000
 
 
 # 读取图片
@@ -233,7 +233,7 @@ correct_prediction = tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), y_)
 acc = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 # 训练次数
-n_epoch = 100
+n_epoch = 10
 sess = tf.InteractiveSession()
 
 saver = tf.train.Saver(max_to_keep=1)

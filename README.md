@@ -9,3 +9,4 @@
 > * [图像和数组相互转换](/src/image2array.py)
 > * [numpy的ndarray简单使用](/src/ndarray_obj.py)
 > * [tensorflow进行图像分类](/src/image_classify.py)
+> * [改良版的tensorflow图像分类](/src/image_classify_new.py)

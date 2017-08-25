@@ -2,7 +2,7 @@
 
 import requests
 import numpy as np
-from PIL import Image
+from skimage import io, transform
 from io import BytesIO
 import pymysql
 import tensorflow as tf
@@ -68,9 +68,9 @@ cat_arr = read_cat()
 # 每个分类的起始id，用来查找数据
 start_ids = {}
 # 每次查找每个分类的数据条数
-batch_size = 70
+batch_size = 10
 # 每一轮循环批量训练的次数
-batch_times = 1000
+batch_times = 500
 
 
 # 读取图片
@@ -100,7 +100,8 @@ def read_image():
         # start_time = time.time()
         for cat in start_ids:
             # 查询语句
-            query_sql = "select * from %s where id >= %d and cat = %d limit %d" % (table, start_ids[cat], cat, batch_size)
+            query_sql = "select * from %s where id >= %d and cat = %d limit %d" \
+                        % (table, start_ids[cat], cat, batch_size)
             # 执行sql语句
             cursor.execute(query_sql)
             # 获取查询结果
@@ -130,20 +131,14 @@ def read_image():
                 # 获取网络图片
                 try:
                     # 加载图片
-                    img = Image.open(BytesIO(response.content))
-                    # img = Image.open('1.jpg')
-                    # 图片尺寸设置为100*100，然后转换为np数组，每个值除以255取浮点数结果
-                    arr = np.round(np.array(img.resize((width, height))) / 255, 4)
+                    img = io.imread(BytesIO(response.content))
+                    arr = transform.resize(img, (width, height))
                     del img
-                    # print(row[0], arr.shape)
-                    # print(arr.shape, arr.dtype)
-                    # img = io.imread(BytesIO(response.content))
-                    # arr = transform.resize(img, (width, height))
                     # print(arr.shape, arr.dtype)
                 except:
                     continue
                 # 填充list
-                if len(arr.shape) == 3 and arr.shape[2] == 3:
+                if len(arr.shape) == 3 and arr.shape[2] == channel:
                     imgs.append(arr)
                     lables.append(cat_arr.index(row[2]))
                 del arr
@@ -231,7 +226,7 @@ logits = tf.layers.dense(inputs=dense2,
 # 损失函数
 loss = tf.losses.sparse_softmax_cross_entropy(labels=y_, logits=logits)
 # 使用Adam 算法的Optimizer
-train_op = tf.train.AdamOptimizer(learning_rate=0.01).minimize(loss)
+train_op = tf.train.AdamOptimizer(learning_rate=0.001).minimize(loss)
 # 结果是否匹配
 correct_prediction = tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), y_)
 # 计算准确率
@@ -270,13 +265,12 @@ for epoch in range(n_epoch):
             if ac > max_acc:
                 max_acc = ac
                 saver.save(sess, 'ckpt/pic-cat')
-            # print(start_ids)
         else:
             # 数据为空时重新初始化起始id
             start_ids = {}
         del x_train_a
         del y_train_a
-    # print("   train loss: %f" % (train_loss / n_batch))
-    # print("   train acc: %f" % (train_acc / n_batch))
-    # sys.stdout.flush()
+        # print("   train loss: %f" % (train_loss / n_batch))
+        # print("   train acc: %f" % (train_acc / n_batch))
+        # sys.stdout.flush()
 sess.close()

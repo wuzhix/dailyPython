@@ -375,7 +375,7 @@ if __name__ == '__main__':
         # 读取分类
         cat_arr = read_cat()
         x, y_, train_op, loss, acc, logits = model()
-        n_epoch = 10 if arg_len >= 3 else int(sys.argv[2])
+        n_epoch = 10 if arg_len < 3 else int(sys.argv[2])
         batch_size = 10 if arg_len < 4 else int(sys.argv[3])
         batch_times = 1000 if arg_len < 5 else int(sys.argv[4])
         train(x, y_, train_op, loss, acc, n_epoch, batch_size, batch_times)

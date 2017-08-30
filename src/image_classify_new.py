@@ -138,8 +138,10 @@ def read_image(batch_size, batch_times):
             # requests.get(url)和Image.open(BytesIO(response.content))都会抛出异常
             try:
                 # get请求图片url
-                url = row[2][:row[2].index('?')]
-                response = requests.get(url)
+                pos = row[2].find('?')
+                if pos != -1:
+                    row[2] = row[2][:pos]
+                response = requests.get(row[2])
             except:
                 continue
             # 图片请求能正常响应
@@ -347,8 +349,10 @@ def check(x, y_, logits):
     db.close()
     try:
         # get请求图片url
-        url = result[2][:result[2].index('?')]
-        response = requests.get(url)
+        pos = result[2].find('?')
+        if pos != -1:
+            result[2] = result[2][:pos]
+        response = requests.get(result[2])
     except:
         print('unable to open pic')
         return

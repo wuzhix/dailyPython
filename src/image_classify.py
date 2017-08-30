@@ -89,7 +89,7 @@ start_ids = {}
 # 每次查找每个分类的数据条数
 batch_size = 10
 # 每一轮循环批量训练的次数
-batch_times = 100
+batch_times = 400
 
 
 # 读取图片
@@ -134,13 +134,17 @@ def read_image():
         sys.stdout.flush()
         imgs = []
         lables = []
+        start_time = time.time()
+        print('prepare image')
         # print(len(results))
         for i, row in enumerate(results):
             # requests.get(url)和Image.open(BytesIO(response.content))都会抛出异常
             try:
                 # get请求图片url
-                url = row[2][:row[2].index('?')]
-                response = requests.get(url)
+                pos = row[2].find('?')
+                if pos != -1:
+                    row[2] = row[2][:pos]
+                response = requests.get(row[2])
             except:
                 continue
             # 图片请求能正常响应
@@ -160,6 +164,10 @@ def read_image():
                     lables.append(cat_arr.index(row[5]))
                 del arr
             del response
+        end_time = time.time()
+        diff = end_time - start_time
+        print('prepare end, count : %d, time : %.2f' % (len(imgs), diff))
+        sys.stdout.flush()
         # asarray将list转换为ndarray
         del results
         # print('make data')
@@ -277,7 +285,7 @@ for epoch in range(n_epoch):
             n_batch += 1
             end_time = time.time()
             diff = end_time - start_time
-            print("epoch: %d, n_batch: %d, err: %f, ac: %f, diff: %.2f" % (epoch, n_batch, err, ac, diff))
+            print("epoch: %d, n_batch: %d, err: %f, ac: %f, time: %.2f" % (epoch, n_batch, err, ac, diff))
             sys.stdout.flush()
             if ac > max_acc:
                 max_acc = ac

@@ -248,7 +248,7 @@ def model():
     # 损失函数
     loss = tf.losses.sparse_softmax_cross_entropy(labels=y_, logits=logits)
     # 使用Adam 算法的Optimizer
-    train_op = tf.train.AdamOptimizer(learning_rate=0.001).minimize(loss)
+    train_op = tf.train.AdamOptimizer(learning_rate=0.01).minimize(loss)
     # 结果是否匹配
     correct_prediction = tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), y_)
     # 计算准确率
@@ -312,7 +312,7 @@ def check(x, y_, logits):
 
     saver = tf.train.Saver(max_to_keep=1)
     # 读取保存的模型
-    model_file = tf.train.latest_checkpoint('ckpt/')
+    model_file = tf.train.latest_checkpoint(table+'/')
     if model_file is None:
         # 如果没有保存模型，初始化所有变量
         sess.run(tf.global_variables_initializer())

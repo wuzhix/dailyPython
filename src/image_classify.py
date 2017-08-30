@@ -243,7 +243,7 @@ logits = tf.layers.dense(inputs=dense2,
 # 损失函数
 loss = tf.losses.sparse_softmax_cross_entropy(labels=y_, logits=logits)
 # 使用Adam 算法的Optimizer
-train_op = tf.train.AdamOptimizer(learning_rate=0.001).minimize(loss)
+train_op = tf.train.AdamOptimizer(learning_rate=0.01).minimize(loss)
 # 结果是否匹配
 correct_prediction = tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), y_)
 # 计算准确率

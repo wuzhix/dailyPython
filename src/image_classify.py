@@ -64,7 +64,7 @@ def read_cat():
         # 使用cursor()方法获取操作游标
         cursor = db.cursor()
         # 查出所有不同类别
-        query_sql = "select distinct(two) from %s where two != 0" % table
+        query_sql = "select distinct(three) from %s where three != 0" % table
         # 执行sql语句
         cursor.execute(query_sql)
         # 获取查询结果
@@ -89,7 +89,7 @@ start_ids = {}
 # 每次查找每个分类的数据条数
 batch_size = 10
 # 每一轮循环批量训练的次数
-batch_times = 1000
+batch_times = 100
 
 
 # 读取图片
@@ -112,7 +112,7 @@ def read_image():
         sys.stdout.flush()
         for cat in start_ids:
             # 查询语句
-            query_sql = "select * from %s where id >= %d and two = %d limit %d" \
+            query_sql = "select * from %s where id >= %d and three = %d limit %d" \
                         % (table, start_ids[cat], cat, batch_size)
             # 执行sql语句
             cursor.execute(query_sql)
@@ -157,7 +157,7 @@ def read_image():
                 # 填充list
                 if len(arr.shape) == 3 and arr.shape[2] == channel:
                     imgs.append(arr)
-                    lables.append(cat_arr.index(row[4]))
+                    lables.append(cat_arr.index(row[5]))
                 del arr
             del response
         # asarray将list转换为ndarray

@@ -1,3 +1,22 @@
+'''
+CREATE TABLE `goods_cat` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '自增id',
+  `parentid` int(10) NOT NULL DEFAULT '0' COMMENT '父类id',
+  `catid` int(10) unsigned NOT NULL COMMENT '分类id',
+  `catname` varchar(50) NOT NULL DEFAULT '' COMMENT '分类名称',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `goods_pic` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '自增id',
+  `sa_id` bigint(20) unsigned NOT NULL COMMENT '图片id',
+  `pic` varchar(255) NOT NULL DEFAULT '' COMMENT '图片url',
+  `one` smallint(5) unsigned NOT NULL DEFAULT '0' COMMENT '图片一级分类',
+  `two` smallint(5) unsigned NOT NULL DEFAULT '0' COMMENT '图片二级分类',
+  `three` smallint(5) unsigned NOT NULL DEFAULT '0' COMMENT '图片三级分类',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+'''
 # -*- coding: UTF-8 -*-
 
 import requests
@@ -23,14 +42,14 @@ channel = 3
 host = '127.0.0.1'
 redis_port = 6379
 redis_db = 0
-redis_key = 'pic:cat'
+redis_key = 'goods_pic:cat'
 # 定义数据库链接
 server = '127.0.0.1'
 username = 'root'
 password = ''
 db_port = 3306
 database = 'test'
-table = 'pic_data'
+table = 'goods_pic'
 
 # 分类list
 cat_arr = []
@@ -51,7 +70,7 @@ def read_cat():
         # 使用cursor()方法获取操作游标
         cursor = db.cursor()
         # 查出所有不同类别
-        query_sql = "select distinct(cat) from %s" % table
+        query_sql = "select distinct(three) from %s where three != 0" % table
         # 执行sql语句
         cursor.execute(query_sql)
         # 获取查询结果
@@ -86,20 +105,13 @@ def read_image(batch_size, batch_times):
         db.ping()
         # 使用cursor()方法获取操作游标
         cursor = db.cursor()
-        '''
-        数据库表格
-        CREATE TABLE `pic_data` (
-          `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT '图片id',
-          `pic` varchar(255) NOT NULL DEFAULT '' COMMENT '图片url',
-          `cat` int(10) unsigned NOT NULL DEFAULT '0' COMMENT '图片分类',
-          PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-        '''
         results = []
-        # start_time = time.time()
+        start_time = time.time()
+        print('prepare data')
+        sys.stdout.flush()
         for cat in start_ids:
             # 查询语句
-            query_sql = "select * from %s where id >= %d and cat = %d limit %d" \
+            query_sql = "select * from %s where id >= %d and three = %d limit %d" \
                         % (table, start_ids[cat], cat, batch_size)
             # 执行sql语句
             cursor.execute(query_sql)
@@ -115,6 +127,10 @@ def read_image(batch_size, batch_times):
                 else:
                     start_ids[cat] = result[-1][0] + 1
                 del result
+        end_time = time.time()
+        diff = end_time - start_time
+        print('prepare end, count : %d, time : %.2f' % (len(results), diff))
+        sys.stdout.flush()
         imgs = []
         lables = []
         # print(len(results))
@@ -122,7 +138,8 @@ def read_image(batch_size, batch_times):
             # requests.get(url)和Image.open(BytesIO(response.content))都会抛出异常
             try:
                 # get请求图片url
-                response = requests.get(row[1])
+                url = row[2][:row[2].index('?')]
+                response = requests.get(url)
             except:
                 continue
             # 图片请求能正常响应
@@ -139,7 +156,7 @@ def read_image(batch_size, batch_times):
                 # 填充list
                 if len(arr.shape) == 3 and arr.shape[2] == channel:
                     imgs.append(arr)
-                    lables.append(cat_arr.index(row[2]))
+                    lables.append(cat_arr.index(row[5]))
                 del arr
             del response
         # asarray将list转换为ndarray
@@ -255,7 +272,7 @@ def train(x, y_, train_op, loss, acc, n_epoch=10, batch_size=10, batch_times=100
 
     saver = tf.train.Saver(max_to_keep=1)
     # 读取保存的模型
-    model_file = tf.train.latest_checkpoint('ckpt/')
+    model_file = tf.train.latest_checkpoint(table+'/')
     if model_file is None:
         # 如果没有保存模型，初始化所有变量
         sess.run(tf.global_variables_initializer())
@@ -275,12 +292,12 @@ def train(x, y_, train_op, loss, acc, n_epoch=10, batch_size=10, batch_times=100
             train_acc += ac
             n_batch += 1
             end_time = time.time()
-            diff = round(end_time - start_time, 2)
-            print("epoch: %d, n_batch: %d, err: %f, ac: %f, diff: %f" % (epoch, n_batch, err, ac, diff))
+            diff = end_time - start_time
+            print("epoch: %d, n_batch: %d, err: %f, ac: %f, diff: %.2f" % (epoch, n_batch, err, ac, diff))
             sys.stdout.flush()
             if ac > max_acc:
                 max_acc = ac
-                saver.save(sess, 'ckpt/pic-cat')
+                saver.save(sess, table + '/pic-cat')
             del x_train_a
             del y_train_a
             # print("   train loss: %f" % (train_loss / n_batch))
@@ -330,7 +347,8 @@ def check(x, y_, logits):
     db.close()
     try:
         # get请求图片url
-        response = requests.get(result[1])
+        url = result[2][:result[2].index('?')]
+        response = requests.get(url)
     except:
         print('unable to open pic')
         return
@@ -351,7 +369,7 @@ def check(x, y_, logits):
         # 填充list
         if len(arr.shape) == 3 and arr.shape[2] == channel:
             imgs.append(arr)
-            lables.append(cat_arr.index(result[2]))
+            lables.append(cat_arr.index(result[5]))
         del arr
 
     x_train_a = np.asarray(imgs, np.float32)
@@ -377,7 +395,7 @@ if __name__ == '__main__':
         x, y_, train_op, loss, acc, logits = model()
         n_epoch = 10 if arg_len < 3 else int(sys.argv[2])
         batch_size = 10 if arg_len < 4 else int(sys.argv[3])
-        batch_times = 1000 if arg_len < 5 else int(sys.argv[4])
+        batch_times = 100 if arg_len < 5 else int(sys.argv[4])
         train(x, y_, train_op, loss, acc, n_epoch, batch_size, batch_times)
     elif sys.argv[1] == 'check':
         # 读取分类

@@ -105,7 +105,7 @@ def read_image(batch_size, batch_times):
             cursor.execute(query_sql)
             # 获取查询结果
             result = cursor.fetchall()
-            if result is not None:
+            if len(result) > 0:
                 results = results + list(result)
                 # print(query_sql)
                 # print(result, cat, start_ids[cat])

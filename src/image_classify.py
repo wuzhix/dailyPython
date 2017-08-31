@@ -87,9 +87,9 @@ cat_arr = read_cat()
 # 每个分类的起始id，用来查找数据
 start_ids = {}
 # 每次查找每个分类的数据条数
-batch_size = 10
+batch_size = 1
 # 每一轮循环批量训练的次数
-batch_times = 400
+batch_times = 1000
 
 
 # 读取图片
@@ -136,6 +136,7 @@ def read_image():
         lables = []
         start_time = time.time()
         print('prepare image')
+        sys.stdout.flush()
         # print(len(results))
         for i, row in enumerate(results):
             # requests.get(url)和Image.open(BytesIO(response.content))都会抛出异常

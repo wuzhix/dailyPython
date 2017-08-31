@@ -50,6 +50,14 @@ db_port = 3306
 database = 'test'
 table = 'goods_pic'
 
+# 获取分类
+cat_arr = []
+start_id = 1
+# 每次查询条数
+batch_size = 1000
+# 每一轮循环批量训练的次数
+batch_times = 2000
+
 
 # 读取图片分类
 def read_cat():
@@ -82,23 +90,9 @@ def read_cat():
     return cat_data
 
 
-# 获取分类
-cat_arr = read_cat()
-# 每个分类的起始id，用来查找数据
-start_ids = {}
-# 每次查找每个分类的数据条数
-batch_size = 1
-# 每一轮循环批量训练的次数
-batch_times = 1000
-
-
 # 读取图片
 def read_image():
-    # 初始化每种分类的图片起始id
-    if len(start_ids) == 0:
-        for cat in cat_arr:
-            start_ids[cat] = 1
-    # print(start_ids)
+    global start_id
     # 连接数据库，这里一定要加上charset，不然读取的中文会乱码
     db = pymysql.connect(host=server, port=db_port, user=username, password=password, database=database, charset="utf8")
     cur_times = 0
@@ -106,39 +100,17 @@ def read_image():
         db.ping()
         # 使用cursor()方法获取操作游标
         cursor = db.cursor()
-        results = []
-        start_time = time.time()
-        print('prepare data')
-        sys.stdout.flush()
-        for cat in start_ids:
-            # 查询语句
-            query_sql = "select * from %s where id >= %d and three = %d limit %d" \
-                        % (table, start_ids[cat], cat, batch_size)
-            # 执行sql语句
-            cursor.execute(query_sql)
-            # 获取查询结果
-            result = cursor.fetchall()
-            if len(result) > 0:
-                results = results + list(result)
-                # print(query_sql)
-                # print(result, cat, start_ids[cat])
-                # 更新每种分类的起始id
-                if result[-1][0] == start_ids[cat]:
-                    start_ids[cat] += batch_size + 1
-                else:
-                    start_ids[cat] = result[-1][0] + 1
-                del result
-        end_time = time.time()
-        diff = end_time - start_time
-        print('prepare end, count : %d, time : %.2f' % (len(results), diff))
-        sys.stdout.flush()
+        # 查询语句
+        query_sql = "select * from %s where id >= %d and three != 0 limit %d" % (table, start_id, batch_size)
+        # 执行sql语句
+        cursor.execute(query_sql)
+        # 获取查询结果
+        result = cursor.fetchall()
+        start_id += len(result)
         imgs = []
         lables = []
-        start_time = time.time()
-        print('prepare image')
-        sys.stdout.flush()
-        # print(len(results))
-        for i, row in enumerate(results):
+        # print(len(result))
+        for i, row in enumerate(result):
             # requests.get(url)和Image.open(BytesIO(response.content))都会抛出异常
             try:
                 # get请求图片url
@@ -165,23 +137,17 @@ def read_image():
                     lables.append(cat_arr.index(row[5]))
                 del arr
             del response
-        end_time = time.time()
-        diff = end_time - start_time
-        print('prepare end, count : %d, time : %.2f' % (len(imgs), diff))
-        sys.stdout.flush()
         # asarray将list转换为ndarray
-        del results
-        # print('make data')
-        # end_time = time.time()
-        # diff = round(end_time - start_time, 2)
-        # print('make data: ', diff)
         yield np.asarray(imgs, np.float32), np.asarray(lables, np.int32)
         del imgs
         del lables
         cur_times += 1
         if cur_times >= batch_times:
-            db.close()
             break
+
+
+# 获取分类
+cat_arr = read_cat()
 
 
 # -----------------构建网络----------------------
@@ -286,14 +252,12 @@ for epoch in range(n_epoch):
             n_batch += 1
             end_time = time.time()
             diff = end_time - start_time
-            print("epoch: %d, n_batch: %d, err: %f, ac: %f, time: %.2f" % (epoch, n_batch, err, ac, diff))
+            cur_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            print("%s epoch: %d, n_batch: %d, err: %f, ac: %f, time: %.2f" % (cur_date, epoch, n_batch, err, ac, diff))
             sys.stdout.flush()
             if ac > max_acc:
                 max_acc = ac
                 saver.save(sess, table + '/pic-cat')
-        else:
-            # 数据为空时重新初始化起始id
-            start_ids = {}
         del x_train_a
         del y_train_a
         # print("   train loss: %f" % (train_loss / n_batch))

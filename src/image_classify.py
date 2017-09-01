@@ -16,6 +16,23 @@ CREATE TABLE `goods_pic` (
   `three` smallint(5) unsigned NOT NULL DEFAULT '0' COMMENT '图片三级分类',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+图像匹配系统流程：
+分类训练系统
+1、批量读入图像，通过卷积，池化得到抽象特征
+2、通过交叉熵损失函数，Adam优化算法计算权重矩阵
+3、抽象特征*权重矩阵的结果，经过softmax归一化，得出图像的分类概率
+4、每张图片概率最大的分类与正确分类进行比较，计算准确率
+5、保存训练结果
+匹配系统
+1、保存每张图片的抽象特征*权重矩阵的结果
+2、每种分类选择一张图片作为基础图片，该分类的其他图片计算与该图片的欧氏距离
+3、设置相似图片欧氏距离为想<=n
+4、任选一张图片，通过训练结果得出该图片分类，找到该分类的基础图片
+5、计算该图片与基础图片的欧氏距离m
+6、从该分类中查出所有与基础图片欧氏距离在m-n到m+n之间的图片，如果m-n<=则范围是0到m+n之间
+7、重新计算该图片与图片集中的图片的欧氏距离，过滤掉欧氏距离>n的图片
+8、剩下的图片即为相似图片
 '''
 # -*- coding: UTF-8 -*-
 
@@ -54,9 +71,9 @@ table = 'goods_pic'
 cat_arr = []
 start_id = 1
 # 每次查询条数
-batch_size = 1000
+batch_size = 100
 # 每一轮循环批量训练的次数
-batch_times = 2000
+batch_times = 20000
 
 
 # 读取图片分类
@@ -72,7 +89,7 @@ def read_cat():
         # 使用cursor()方法获取操作游标
         cursor = db.cursor()
         # 查出所有不同类别
-        query_sql = "select distinct(three) from %s where three != 0" % table
+        query_sql = "select distinct(two) from %s where two != 0" % table
         # 执行sql语句
         cursor.execute(query_sql)
         # 获取查询结果
@@ -134,7 +151,7 @@ def read_image():
                 # 填充list
                 if len(arr.shape) == 3 and arr.shape[2] == channel:
                     imgs.append(arr)
-                    lables.append(cat_arr.index(row[5]))
+                    lables.append(cat_arr.index(row[4]))
                 del arr
             del response
         # asarray将list转换为ndarray
@@ -218,7 +235,7 @@ logits = tf.layers.dense(inputs=dense2,
 # 损失函数
 loss = tf.losses.sparse_softmax_cross_entropy(labels=y_, logits=logits)
 # 使用Adam 算法的Optimizer
-train_op = tf.train.AdamOptimizer(learning_rate=0.01).minimize(loss)
+train_op = tf.train.AdamOptimizer(learning_rate=0.001).minimize(loss)
 # 结果是否匹配
 correct_prediction = tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), y_)
 # 计算准确率

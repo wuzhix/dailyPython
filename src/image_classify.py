@@ -89,7 +89,7 @@ def read_cat():
         # 使用cursor()方法获取操作游标
         cursor = db.cursor()
         # 查出所有不同类别
-        query_sql = "select distinct(two) from %s where two != 0" % table
+        query_sql = "select distinct(three) from %s where three != 0" % table
         # 执行sql语句
         cursor.execute(query_sql)
         # 获取查询结果
@@ -151,7 +151,7 @@ def read_image():
                 # 填充list
                 if len(arr.shape) == 3 and arr.shape[2] == channel:
                     imgs.append(arr)
-                    lables.append(cat_arr.index(row[4]))
+                    lables.append(cat_arr.index(row[5]))
                 del arr
             del response
         # asarray将list转换为ndarray

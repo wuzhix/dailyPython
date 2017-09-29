@@ -14,3 +14,4 @@
 > * [tensorflow 基础数据转换](/src/tf_casting.py)
 > * [清理历史文件](/src/clear_historyfile.py)
 > * [将数据生成递归结果集](/src/node.py)
+> * [约数求和算法](/src/divisor.py)

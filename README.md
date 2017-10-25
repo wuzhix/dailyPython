@@ -15,3 +15,4 @@
 > * [清理历史文件](/src/clear_historyfile.py)
 > * [将数据生成递归结果集](/src/node.py)
 > * [约数求和算法](/src/divisor.py)
+> * [判断字符串中{}是否成对匹配](/src/algorithm1.py)
